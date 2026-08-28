@@ -1,0 +1,3 @@
+# Download netflix_titles.csv from:
+# https://www.kaggle.com/datasets/shivamb/netflix-shows
+# Then upload to Databricks DBFS: /FileStore/netflix/netflix_titles.csv
