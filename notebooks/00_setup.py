@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 00 — Setup
 # MAGIC Install dependencies and create the medallion database schemas.
@@ -22,7 +26,8 @@ for db in ["netflix_bronze", "netflix_silver", "netflix_gold", "netflix_ai"]:
 # COMMAND ----------
 
 # Shared path constants — imported by every notebook
-RAW_CSV        = "/Volumes/netflix/default/aidataset/netflix_titles.csv"
+VOLUME_ROOT    = "/Volumes/netflix/default/aidataset/"
+RAW_CSV        = f"{VOLUME_ROOT}netflix_titles.csv"
 
 BRONZE_TABLE   = "netflix_bronze.raw_titles"
 SILVER_DB      = "netflix_silver"
