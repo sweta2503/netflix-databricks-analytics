@@ -1,164 +1,213 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Layer 3 — Gold (Business Analytics Tables)
-# MAGIC Reads Silver. Produces 6 Gold tables — one per business question.
-# MAGIC These are what the AI layer and dashboard read.
+# MAGIC # 03 — Gold Layer: Business Analytics Tables
+# MAGIC Reads Silver. Builds 6 dbt mart models as Delta tables.
+# MAGIC These are the final, query-ready tables for AI and dashboard.
 
 # COMMAND ----------
 
-from pyspark.sql import functions as F
+import subprocess, os
 
-SILVER_TABLE = "netflix_silver.titles"
+DBT_ROOT = "/tmp/netflix_dbt"
 
-df = spark.table(SILVER_TABLE)
-print(f"📥 Silver rows: {df.count():,}")
+# Write all mart SQL models
+marts = {}
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Gold 1 — Content type split by year
-
-# COMMAND ----------
-
-gold_type_by_year = (
-    df
-    .filter(F.col("added_year").isNotNull())
-    .groupBy("added_year", "type")
-    .agg(F.count("*").alias("titles_count"))
-    .orderBy("added_year", "type")
+marts["content_by_year"] = """
+with base as (
+    select * from {{ ref('stg_titles') }}
+    where added_year is not null
 )
+select
+    added_year,
+    type,
+    count(*) as titles_count
+from base
+group by added_year, type
+order by added_year, type
+"""
 
-gold_type_by_year.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("netflix_gold.type_by_year")
-print("✅ gold.type_by_year")
-display(gold_type_by_year)
+marts["genre_distribution"] = """
+with exploded as (
+    select
+        explode(genres) as genre,
+        type
+    from {{ ref('stg_titles') }}
+),
+cleaned as (
+    select trim(genre) as genre, type
+    from exploded
+    where trim(genre) != ''
+)
+select
+    genre,
+    type,
+    count(*) as title_count
+from cleaned
+group by genre, type
+order by title_count desc
+"""
+
+marts["country_analysis"] = """
+with base as (
+    select * from {{ ref('stg_titles') }}
+    where primary_country is not null
+      and trim(primary_country) != ''
+)
+select
+    trim(primary_country) as country,
+    count(*) as total_titles,
+    sum(case when is_movie then 1 else 0 end) as movies,
+    sum(case when not is_movie then 1 else 0 end) as tv_shows,
+    round(
+        sum(case when is_movie then 1 else 0 end) * 100.0 / count(*), 1
+    ) as movie_pct
+from base
+group by trim(primary_country)
+order by total_titles desc
+limit 25
+"""
+
+marts["rating_distribution"] = """
+select
+    rating,
+    type,
+    count(*) as count,
+    round(count(*) * 100.0 / sum(count(*)) over (partition by type), 1) as pct_within_type
+from {{ ref('stg_titles') }}
+where rating is not null
+group by rating, type
+order by type, count desc
+"""
+
+marts["top_directors"] = """
+select
+    director,
+    count(*) as total_titles,
+    sum(case when type = 'Movie'   then 1 else 0 end) as movies,
+    sum(case when type = 'TV Show' then 1 else 0 end) as tv_shows,
+    min(release_year) as earliest_year,
+    max(release_year) as latest_year
+from {{ ref('stg_titles') }}
+where director is not null
+group by director
+having count(*) >= 2
+order by total_titles desc
+limit 20
+"""
+
+marts["international_growth"] = """
+with base as (
+    select
+        added_year,
+        primary_country,
+        (trim(primary_country) = 'United States') as is_us
+    from {{ ref('stg_titles') }}
+    where added_year is not null
+      and primary_country is not null
+)
+select
+    added_year,
+    count(*) as total_titles,
+    sum(case when is_us then 1 else 0 end) as us_titles,
+    sum(case when not is_us then 1 else 0 end) as international_titles,
+    round(
+        sum(case when not is_us then 1 else 0 end) * 100.0 / count(*), 1
+    ) as international_pct
+from base
+group by added_year
+order by added_year
+"""
+
+# Write mart SQL files
+for name, sql in marts.items():
+    with open(f"{DBT_ROOT}/models/marts/{name}.sql", "w") as f:
+        f.write(sql.strip())
+    print(f"  wrote models/marts/{name}.sql")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Gold 2 — Top countries by content volume
+# Write mart schema.yml with tests
+schema_yml = """
+version: 2
+models:
+  - name: content_by_year
+    columns:
+      - name: added_year
+        tests: [not_null]
+      - name: titles_count
+        tests: [not_null]
+
+  - name: country_analysis
+    columns:
+      - name: country
+        tests: [not_null, unique]
+
+  - name: genre_distribution
+    columns:
+      - name: genre
+        tests: [not_null]
+
+  - name: rating_distribution
+    columns:
+      - name: rating
+        tests: [not_null]
+
+  - name: top_directors
+    columns:
+      - name: director
+        tests: [not_null, unique]
+
+  - name: international_growth
+    columns:
+      - name: added_year
+        tests: [not_null, unique]
+"""
+
+with open(f"{DBT_ROOT}/models/marts/schema.yml", "w") as f:
+    f.write(schema_yml)
 
 # COMMAND ----------
 
-gold_top_countries = (
-    df
-    .filter(F.col("primary_country").isNotNull())
-    .groupBy("primary_country")
-    .agg(
-        F.count("*").alias("total_titles"),
-        F.sum(F.col("is_movie").cast("int")).alias("movies"),
-        (F.count("*") - F.sum(F.col("is_movie").cast("int"))).alias("tv_shows"),
+def run_dbt(command):
+    result = subprocess.run(
+        f"cd {DBT_ROOT} && dbt {command} --profiles-dir /root/.dbt",
+        shell=True, capture_output=True, text=True
     )
-    .orderBy(F.col("total_titles").desc())
-    .limit(20)
-)
-
-gold_top_countries.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("netflix_gold.top_countries")
-print("✅ gold.top_countries")
-display(gold_top_countries)
+    print(result.stdout)
+    if result.returncode != 0:
+        print("STDERR:", result.stderr)
+        raise RuntimeError(f"dbt {command} failed")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Gold 3 — Genre distribution (exploded)
+print("Running: dbt run --select marts")
+run_dbt("run --select marts")
 
 # COMMAND ----------
 
-gold_genres = (
-    df
-    .select(F.explode(F.col("genres")).alias("genre"), "type")
-    .withColumn("genre", F.trim(F.col("genre")))
-    .filter(F.col("genre") != "")
-    .groupBy("genre", "type")
-    .agg(F.count("*").alias("count"))
-    .orderBy(F.col("count").desc())
-)
-
-gold_genres.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("netflix_gold.genre_distribution")
-print("✅ gold.genre_distribution")
-display(gold_genres.limit(20))
+print("Running: dbt test --select marts")
+run_dbt("test --select marts")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Gold 4 — Rating distribution
+# MAGIC %md ## Summary
 
 # COMMAND ----------
 
-gold_ratings = (
-    df
-    .filter(F.col("rating").isNotNull())
-    .groupBy("rating", "type")
-    .agg(F.count("*").alias("count"))
-    .orderBy(F.col("count").desc())
-)
+gold_tables = [
+    "netflix_gold.content_by_year",
+    "netflix_gold.genre_distribution",
+    "netflix_gold.country_analysis",
+    "netflix_gold.rating_distribution",
+    "netflix_gold.top_directors",
+    "netflix_gold.international_growth",
+]
 
-gold_ratings.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("netflix_gold.rating_distribution")
-print("✅ gold.rating_distribution")
-display(gold_ratings)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Gold 5 — Top directors (movies only)
-
-# COMMAND ----------
-
-gold_directors = (
-    df
-    .filter(F.col("director").isNotNull() & (F.col("type") == "Movie"))
-    .groupBy("director")
-    .agg(F.count("*").alias("movie_count"))
-    .orderBy(F.col("movie_count").desc())
-    .limit(15)
-)
-
-gold_directors.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("netflix_gold.top_directors")
-print("✅ gold.top_directors")
-display(gold_directors)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Gold 6 — International content growth (non-US)
-
-# COMMAND ----------
-
-gold_intl_growth = (
-    df
-    .filter(F.col("added_year").isNotNull() & F.col("primary_country").isNotNull())
-    .withColumn("is_us", F.col("primary_country") == "United States")
-    .groupBy("added_year")
-    .agg(
-        F.count("*").alias("total"),
-        F.sum(F.col("is_us").cast("int")).alias("us_titles"),
-        (F.count("*") - F.sum(F.col("is_us").cast("int"))).alias("international_titles"),
-    )
-    .withColumn("intl_pct", F.round(F.col("international_titles") / F.col("total") * 100, 1))
-    .orderBy("added_year")
-)
-
-gold_intl_growth.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("netflix_gold.international_growth")
-print("✅ gold.international_growth")
-display(gold_intl_growth)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Summary stats (passed to AI layer)
-
-# COMMAND ----------
-
-total        = df.count()
-movies       = df.filter(F.col("type") == "Movie").count()
-shows        = df.filter(F.col("type") == "TV Show").count()
-countries    = df.filter(F.col("primary_country").isNotNull()).select("primary_country").distinct().count()
-year_min     = df.agg(F.min("added_year")).collect()[0][0]
-year_max     = df.agg(F.max("added_year")).collect()[0][0]
-
-print("=== GOLD SUMMARY ===")
-print(f"  Total titles       : {total:,}")
-print(f"  Movies             : {movies:,}  ({round(movies/total*100,1)}%)")
-print(f"  TV Shows           : {shows:,}  ({round(shows/total*100,1)}%)")
-print(f"  Countries covered  : {countries}")
-print(f"  Year range added   : {year_min} – {year_max}")
-print("\n✅ All 6 Gold tables ready")
+print("=== GOLD LAYER READY ===")
+for t in gold_tables:
+    try:
+        count = spark.table(t).count()
+        print(f"  ✅ {t:<45} {count:>5,} rows")
+    except Exception as e:
+        print(f"  ❌ {t} — {e}")

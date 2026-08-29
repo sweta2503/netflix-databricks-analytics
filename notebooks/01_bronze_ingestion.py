@@ -1,47 +1,41 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Layer 1 — Bronze (Raw Ingestion)
-# MAGIC Reads the raw Netflix CSV from DBFS and writes it as a Delta table.
-# MAGIC No transformations — bronze is the source of truth.
+# MAGIC # 01 — Bronze Layer: Raw Ingestion
+# MAGIC Reads raw Netflix CSV from DBFS. Writes as-is to a Delta table.
+# MAGIC Bronze = source of truth. Zero transformations.
 
 # COMMAND ----------
 
-RAW_CSV_PATH = "dbfs:/FileStore/netflix/netflix_titles.csv"
-BRONZE_TABLE = "netflix.raw_titles"
-BRONZE_PATH  = "dbfs:/user/hive/warehouse/netflix_bronze/raw_titles"
+RAW_CSV      = "dbfs:/FileStore/netflix/netflix_titles.csv"
+BRONZE_TABLE = "netflix_bronze.raw_titles"
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Read raw CSV
+# MAGIC %md ## Ingest
 
 # COMMAND ----------
 
 df_raw = (
     spark.read
     .option("header", "true")
-    .option("multiLine", "true")   # some descriptions span multiple lines
+    .option("multiLine", "true")
     .option("escape", '"')
-    .csv(RAW_CSV_PATH)
+    .option("encoding", "UTF-8")
+    .csv(RAW_CSV)
 )
 
-print(f"📥 Rows loaded: {df_raw.count():,}")
+row_count = df_raw.count()
+print(f"📥 Raw rows  : {row_count:,}")
 print(f"📋 Columns   : {len(df_raw.columns)}")
 df_raw.printSchema()
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Preview raw data
+display(df_raw.limit(5))
 
 # COMMAND ----------
 
-display(df_raw.limit(10))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Write to Bronze Delta table
+# MAGIC %md ## Write Bronze Delta table
 
 # COMMAND ----------
 
@@ -52,35 +46,32 @@ display(df_raw.limit(10))
     .option("overwriteSchema", "true")
     .saveAsTable(BRONZE_TABLE)
 )
-
-print(f"✅ Bronze table written: {BRONZE_TABLE}")
-print(f"   Rows: {spark.table(BRONZE_TABLE).count():,}")
+print(f"✅ Bronze table: {BRONZE_TABLE}  ({row_count:,} rows)")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Bronze data quality check
+# MAGIC %md ## Data quality report
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, count, when, isnan, isnull
+from pyspark.sql.functions import col, isnull
 
-df_bronze = spark.table(BRONZE_TABLE)
-total = df_bronze.count()
+df_b = spark.table(BRONZE_TABLE)
+total = df_b.count()
 
-print("=== NULL / MISSING VALUE REPORT ===")
-for column in df_bronze.columns:
-    null_count = df_bronze.filter(isnull(col(column)) | (col(column) == "")).count()
-    pct = round(null_count / total * 100, 1)
-    flag = "⚠️ " if pct > 10 else "✅ "
-    print(f"{flag} {column:<20} nulls: {null_count:>5,}  ({pct}%)")
+print(f"{'Column':<22} {'Nulls':>7} {'%':>6}")
+print("-" * 38)
+for c in df_b.columns:
+    nulls = df_b.filter(isnull(col(c)) | (col(c) == "")).count()
+    pct   = nulls / total * 100
+    flag  = "⚠️ " if pct > 10 else "   "
+    print(f"{flag}{c:<20} {nulls:>7,} {pct:>5.1f}%")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Delta table history (time travel available from first write)
+# MAGIC %md ## Delta time travel — already available
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DESCRIBE HISTORY netflix.raw_titles
+# MAGIC DESCRIBE HISTORY netflix_bronze.raw_titles;
