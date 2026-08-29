@@ -6,7 +6,7 @@
 
 # COMMAND ----------
 
-RAW_CSV      = "dbfs:/FileStore/netflix/netflix_titles.csv"
+RAW_CSV      = "/Volumes/netflix/default/aidataset/netflix_titles.csv"
 BRONZE_TABLE = "netflix_bronze.raw_titles"
 
 # COMMAND ----------

@@ -22,8 +22,7 @@ for db in ["netflix_bronze", "netflix_silver", "netflix_gold", "netflix_ai"]:
 # COMMAND ----------
 
 # Shared path constants — imported by every notebook
-DBFS_ROOT      = "dbfs:/FileStore/netflix"
-RAW_CSV        = f"{DBFS_ROOT}/netflix_titles.csv"
+RAW_CSV        = "/Volumes/netflix/default/aidataset/netflix_titles.csv"
 
 BRONZE_TABLE   = "netflix_bronze.raw_titles"
 SILVER_DB      = "netflix_silver"
@@ -31,8 +30,8 @@ GOLD_DB        = "netflix_gold"
 AI_DB          = "netflix_ai"
 
 print("📁 Path constants ready")
-print(f"   Upload your CSV to: {RAW_CSV}")
+print(f"   CSV path : {RAW_CSV}")
 print()
 print("Next steps:")
-print("  1. Upload netflix_titles.csv → Data > Add Data > DBFS > FileStore/netflix/")
+print("  1. Confirm netflix_titles.csv is in your Volume at the path above")
 print("  2. Run 01_bronze_ingestion")
