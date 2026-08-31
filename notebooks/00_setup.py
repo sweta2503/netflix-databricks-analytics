@@ -1,9 +1,12 @@
 # Databricks notebook source
-# /// script
-# [tool.databricks.environment]
-# environment_version = "5"
-# ///
-# MAGIC %pip install anthropic==0.40.0 dbt-databricks==1.9.0 --quiet
+# MAGIC %md
+# MAGIC # 00 — Setup
+# MAGIC Install dependencies and create the medallion database schemas.
+# MAGIC Run this once before anything else.
+
+# COMMAND ----------
+
+# MAGIC %pip install groq==0.13.0 dbt-databricks==1.9.0 --quiet
 
 # COMMAND ----------
 
@@ -19,8 +22,7 @@ for db in ["netflix_bronze", "netflix_silver", "netflix_gold", "netflix_ai"]:
 # COMMAND ----------
 
 # Shared path constants — imported by every notebook
-VOLUME_ROOT    = "/Volumes/netflix/default/aidataset/"
-RAW_CSV        = f"{VOLUME_ROOT}netflix_titles.csv"
+RAW_CSV        = "/Volumes/netflix/default/aidataset/netflix_titles.csv"
 
 BRONZE_TABLE   = "netflix_bronze.raw_titles"
 SILVER_DB      = "netflix_silver"

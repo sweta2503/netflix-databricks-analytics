@@ -1,13 +1,12 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 06 — AI Layer 3: Semantic Content Search (RAG)
+# MAGIC # 06 — AI Layer 3: Semantic Content Search / RAG (Groq + Llama 70B)
 # MAGIC User describes what they want to watch in plain English.
-# MAGIC Claude finds the best matching Netflix titles grounded in real descriptions.
-# MAGIC No vector database needed — uses Claude's context window directly.
+# MAGIC Groq finds the best matching Netflix titles from the enriched catalog.
 
 # COMMAND ----------
 
-# MAGIC %pip install anthropic==0.40.0 --quiet
+# MAGIC %pip install groq==0.13.0 --quiet
 
 # COMMAND ----------
 
@@ -15,31 +14,28 @@
 
 # COMMAND ----------
 
-import anthropic, json
+from groq import Groq
 from pyspark.sql import functions as F
 
-dbutils.widgets.text("ANTHROPIC_API_KEY", "", "Anthropic API Key")
-API_KEY = dbutils.widgets.get("ANTHROPIC_API_KEY")
+dbutils.widgets.text("GROQ_API_KEY", "", "Groq API Key")
+API_KEY = dbutils.widgets.get("GROQ_API_KEY")
 if not API_KEY:
-    raise ValueError("Paste your Anthropic API key in the widget above.")
+    raise ValueError("Paste your Groq API key. Get it free at console.groq.com")
 
-client = anthropic.Anthropic(api_key=API_KEY)
-
-# COMMAND ----------
-
-# MAGIC %md ## Load enriched catalog
+client = Groq(api_key=API_KEY)
+MODEL  = "llama3-70b-8192"
+print(f"✅ Groq client ready — model: {MODEL}")
 
 # COMMAND ----------
 
-# Build a lightweight catalog Claude can search through
+# MAGIC %md ## Build catalog context
+
+# COMMAND ----------
+
 df_catalog = (
     spark.table("netflix_ai.enriched_titles")
-    .select(
-        "show_id", "title", "type", "genres_raw",
-        "primary_country", "release_year",
-        "mood", "target_audience", "decade_feel", "themes",
-        "description"
-    )
+    .select("show_id", "title", "type", "genres_raw", "primary_country",
+            "release_year", "mood", "target_audience", "decade_feel", "themes", "description")
     .filter(F.col("description").isNotNull())
 )
 
@@ -48,11 +44,7 @@ print(f"📚 Catalog loaded: {len(catalog_rows)} titles")
 
 # COMMAND ----------
 
-# MAGIC %md ## RAG search function
-
-# COMMAND ----------
-
-def build_catalog_context(rows: list) -> str:
+def build_catalog_context(rows):
     lines = []
     for r in rows:
         themes = ", ".join(r.get("themes") or [])
@@ -60,38 +52,40 @@ def build_catalog_context(rows: list) -> str:
             f"[{r['show_id']}] {r['title']} ({r['type']}, {r['release_year']}) | "
             f"Mood: {r.get('mood')} | Audience: {r.get('target_audience')} | "
             f"Genres: {r['genres_raw']} | Themes: {themes} | "
-            f"Description: {r['description'][:200]}"
+            f"Desc: {str(r['description'])[:200]}"
         )
     return "\n".join(lines)
-
 
 CATALOG_CONTEXT = build_catalog_context(catalog_rows)
 
 SYSTEM_PROMPT = f"""You are a Netflix content recommendation engine.
-You have access to the following Netflix catalog:
+You have access to this Netflix catalog:
 
 {CATALOG_CONTEXT}
 
-When a user describes what they want to watch, find the 5 best matches from the catalog above.
-For each match return:
+When a user describes what they want to watch, find the 5 best matches.
+For each match state:
 - Title and type
-- Why it matches (1 sentence, citing specific description details)
+- Why it matches (1 sentence citing specific description details)
 - Mood, audience, genres
 
-Be specific. Only recommend titles that actually exist in the catalog above.
-Ground every recommendation in the actual description provided.
-"""
+Only recommend titles that exist in the catalog above.
+Ground every recommendation in the actual description provided."""
+
+# COMMAND ----------
 
 def semantic_search(query: str):
     print(f"\n🔎 Query: \"{query}\"")
     print("-" * 60)
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = client.chat.completions.create(
+        model=MODEL,
         max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Find me: {query}"}],
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user",   "content": f"Find me: {query}"},
+        ],
     )
-    print(response.content[0].text)
+    print(response.choices[0].message.content)
 
 # COMMAND ----------
 
@@ -115,15 +109,11 @@ semantic_search("a gripping limited series I can finish in one weekend, emotiona
 
 # COMMAND ----------
 
-# MAGIC %md ## Interactive widget
+# MAGIC %md ## Try your own
 
 # COMMAND ----------
 
-dbutils.widgets.text(
-    "search_query",
-    "an inspiring true story about someone overcoming impossible odds",
-    "What do you want to watch?"
-)
-user_query = dbutils.widgets.get("search_query")
-if user_query:
-    semantic_search(user_query)
+dbutils.widgets.text("search_query", "an inspiring true story about someone overcoming impossible odds", "What do you want to watch?")
+q = dbutils.widgets.get("search_query")
+if q:
+    semantic_search(q)
