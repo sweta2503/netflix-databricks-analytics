@@ -11,12 +11,12 @@
 
 import time
 
-dbutils.widgets.text("ANTHROPIC_API_KEY", "", "Anthropic API Key")
+dbutils.widgets.text("GROQ_API_KEY", "", "Anthropic API Key")
 dbutils.widgets.text("DATABRICKS_HOST",   "", "Databricks Host")
 dbutils.widgets.text("DATABRICKS_HTTP_PATH", "", "Databricks HTTP Path")
 dbutils.widgets.text("DATABRICKS_TOKEN",  "", "Databricks Token")
 
-API_KEY   = dbutils.widgets.get("ANTHROPIC_API_KEY")
+API_KEY   = dbutils.widgets.get("GROQ_API_KEY")
 DB_HOST   = dbutils.widgets.get("DATABRICKS_HOST")
 DB_PATH   = dbutils.widgets.get("DATABRICKS_HTTP_PATH")
 DB_TOKEN  = dbutils.widgets.get("DATABRICKS_TOKEN")
@@ -37,8 +37,8 @@ pipeline = [
         "DATABRICKS_HTTP_PATH": DB_PATH,
         "DATABRICKS_TOKEN": DB_TOKEN,
     }, 600),
-    ("04 AI Enrichment",      "04_ai_enrichment",       {"ANTHROPIC_API_KEY": API_KEY}, 900),
-    ("07 AI Insights",        "07_ai_insights",         {"ANTHROPIC_API_KEY": API_KEY}, 600),
+    ("04 AI Enrichment",      "04_ai_enrichment",       {"GROQ_API_KEY": API_KEY}, 900),
+    ("07 AI Insights",        "07_ai_insights",         {"GROQ_API_KEY": API_KEY}, 600),
     ("08 Export",             "08_export_for_dashboard",{},                             300),
 ]
 

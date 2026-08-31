@@ -6,7 +6,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install anthropic==0.40.0 dbt-databricks==1.9.0 --quiet
+# MAGIC %pip install groq==0.13.0 dbt-databricks==1.9.0 --quiet
 
 # COMMAND ----------
 
