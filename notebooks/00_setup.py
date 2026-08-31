@@ -3,13 +3,6 @@
 # [tool.databricks.environment]
 # environment_version = "5"
 # ///
-# MAGIC %md
-# MAGIC # 00 — Setup
-# MAGIC Install dependencies and create the medallion database schemas.
-# MAGIC Run this once before anything else.
-
-# COMMAND ----------
-
 # MAGIC %pip install anthropic==0.40.0 dbt-databricks==1.9.0 --quiet
 
 # COMMAND ----------
