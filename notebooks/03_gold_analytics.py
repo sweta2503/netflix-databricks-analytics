@@ -196,12 +196,12 @@ run_dbt("test --select marts")
 # COMMAND ----------
 
 gold_tables = [
-    "netflix_gold.content_by_year",
-    "netflix_gold.genre_distribution",
-    "netflix_gold.country_analysis",
-    "netflix_gold.rating_distribution",
-    "netflix_gold.top_directors",
-    "netflix_gold.international_growth",
+    "netflix.netflix_gold.content_by_year",
+    "netflix.netflix_gold.genre_distribution",
+    "netflix.netflix_gold.country_analysis",
+    "netflix.netflix_gold.rating_distribution",
+    "netflix.netflix_gold.top_directors",
+    "netflix.netflix_gold.international_growth",
 ]
 
 print("=== GOLD LAYER READY ===")

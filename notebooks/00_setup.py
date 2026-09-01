@@ -14,20 +14,23 @@
 
 # COMMAND ----------
 
-# Medallion databases
+# Create catalog and medallion databases (Unity Catalog 3-part naming)
+spark.sql("CREATE CATALOG IF NOT EXISTS netflix")
+print("✅ catalog: netflix")
+
 for db in ["netflix_bronze", "netflix_silver", "netflix_gold", "netflix_ai"]:
-    spark.sql(f"CREATE DATABASE IF NOT EXISTS {db}")
-    print(f"✅ {db}")
+    spark.sql(f"CREATE DATABASE IF NOT EXISTS netflix.{db}")
+    print(f"✅ netflix.{db}")
 
 # COMMAND ----------
 
 # Shared path constants — imported by every notebook
 RAW_CSV        = "/Volumes/netflix/default/aidataset/netflix_titles.csv"
 
-BRONZE_TABLE   = "netflix_bronze.raw_titles"
-SILVER_DB      = "netflix_silver"
-GOLD_DB        = "netflix_gold"
-AI_DB          = "netflix_ai"
+BRONZE_TABLE   = "netflix.netflix_bronze.raw_titles"
+SILVER_DB      = "netflix.netflix_silver"
+GOLD_DB        = "netflix.netflix_gold"
+AI_DB          = "netflix.netflix_ai"
 
 print("📁 Path constants ready")
 print(f"   CSV path : {RAW_CSV}")

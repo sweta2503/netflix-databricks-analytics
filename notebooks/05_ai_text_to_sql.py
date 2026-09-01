@@ -30,25 +30,25 @@ print(f"✅ Groq client ready — model: {MODEL}")
 SCHEMA_CONTEXT = """
 You have access to these Databricks Delta tables. Use only Spark SQL syntax.
 
-TABLE: netflix_gold.content_by_year
+TABLE: netflix.netflix_gold.content_by_year
   added_year INT, type STRING, titles_count INT
 
-TABLE: netflix_gold.genre_distribution
+TABLE: netflix.netflix_gold.genre_distribution
   genre STRING, type STRING, title_count INT
 
-TABLE: netflix_gold.country_analysis
+TABLE: netflix.netflix_gold.country_analysis
   country STRING, total_titles INT, movies INT, tv_shows INT, movie_pct DOUBLE
 
-TABLE: netflix_gold.rating_distribution
+TABLE: netflix.netflix_gold.rating_distribution
   rating STRING, type STRING, count INT, pct_within_type DOUBLE
 
-TABLE: netflix_gold.top_directors
+TABLE: netflix.netflix_gold.top_directors
   director STRING, total_titles INT, movies INT, tv_shows INT, earliest_year INT, latest_year INT
 
-TABLE: netflix_gold.international_growth
+TABLE: netflix.netflix_gold.international_growth
   added_year INT, total_titles INT, us_titles INT, international_titles INT, international_pct DOUBLE
 
-TABLE: netflix_ai.enriched_titles
+TABLE: netflix.netflix_ai.enriched_titles
   show_id STRING, title STRING, type STRING, genres_raw STRING,
   primary_country STRING, release_year INT, description STRING,
   mood STRING, themes ARRAY<STRING>, target_audience STRING,

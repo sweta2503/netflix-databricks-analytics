@@ -33,7 +33,7 @@ print(f"✅ Groq client ready — model: {MODEL}")
 # COMMAND ----------
 
 df_catalog = (
-    spark.table("netflix_ai.enriched_titles")
+    spark.table("netflix.netflix_ai.enriched_titles")
     .select("show_id", "title", "type", "genres_raw", "primary_country",
             "release_year", "mood", "target_audience", "decade_feel", "themes", "description")
     .filter(F.col("description").isNotNull())

@@ -12,14 +12,14 @@ EXPORT_PATH = "dbfs:/FileStore/netflix/exports"
 dbutils.fs.mkdirs(EXPORT_PATH)
 
 tables = {
-    "content_by_year":       "netflix_gold.content_by_year",
-    "genre_distribution":    "netflix_gold.genre_distribution",
-    "country_analysis":      "netflix_gold.country_analysis",
-    "rating_distribution":   "netflix_gold.rating_distribution",
-    "top_directors":         "netflix_gold.top_directors",
-    "international_growth":  "netflix_gold.international_growth",
-    "enriched_titles":       "netflix_ai.enriched_titles",
-    "strategic_insights":    "netflix_ai.strategic_insights",
+    "content_by_year":       "netflix.netflix_gold.content_by_year",
+    "genre_distribution":    "netflix.netflix_gold.genre_distribution",
+    "country_analysis":      "netflix.netflix_gold.country_analysis",
+    "rating_distribution":   "netflix.netflix_gold.rating_distribution",
+    "top_directors":         "netflix.netflix_gold.top_directors",
+    "international_growth":  "netflix.netflix_gold.international_growth",
+    "enriched_titles":       "netflix.netflix_ai.enriched_titles",
+    "strategic_insights":    "netflix.netflix_ai.strategic_insights",
 }
 
 for name, table in tables.items():
