@@ -33,7 +33,7 @@ netflix_project:
       host: {HOST}
       http_path: {HTTP_PATH}
       token: {TOKEN}
-      catalog: hive_metastore
+      catalog: netflix
       schema: netflix_silver
       threads: 4
 """
@@ -82,7 +82,7 @@ with open(f"{DBT_ROOT}/models/staging/sources.yml", "w") as f:
 version: 2
 sources:
   - name: bronze
-    database: hive_metastore
+    catalog: netflix
     schema: netflix_bronze
     tables:
       - name: raw_titles
@@ -167,6 +167,6 @@ run_dbt("test --select staging")
 # COMMAND ----------
 
 # Verify
-df_silver = spark.table("netflix_silver.stg_titles")
+df_silver = spark.table("netflix.netflix_silver.stg_titles")
 print(f"✅ Silver view ready — {df_silver.count():,} rows")
 display(df_silver.limit(5))

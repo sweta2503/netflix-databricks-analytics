@@ -3,7 +3,7 @@
 # MAGIC # 07 — AI Layer 4: Strategic Analyst (Groq + Llama 70B)
 # MAGIC Reads all Gold tables and AI-enriched data.
 # MAGIC Produces: content strategy, trend analysis, gap analysis, executive summary.
-# MAGIC All saved to netflix_ai.strategic_insights Delta table.
+# MAGIC All saved to netflix.netflix_ai.strategic_insights Delta table.
 
 # COMMAND ----------
 
@@ -54,17 +54,17 @@ print(f"✅ Groq client ready — model: {MODEL}")
 def to_dict(table, limit=100):
     return spark.table(table).limit(limit).toPandas().to_dict(orient="records")
 
-type_by_year  = to_dict("netflix_gold.content_by_year")
-top_countries = to_dict("netflix_gold.country_analysis", limit=15)
-genres        = to_dict("netflix_gold.genre_distribution", limit=20)
-ratings       = to_dict("netflix_gold.rating_distribution")
-intl_growth   = to_dict("netflix_gold.international_growth")
+type_by_year  = to_dict("netflix.netflix_gold.content_by_year")
+top_countries = to_dict("netflix.netflix_gold.country_analysis", limit=15)
+genres        = to_dict("netflix.netflix_gold.genre_distribution", limit=20)
+ratings       = to_dict("netflix.netflix_gold.rating_distribution")
+intl_growth   = to_dict("netflix.netflix_gold.international_growth")
 
-df_ai         = spark.table("netflix_ai.enriched_titles")
+df_ai         = spark.table("netflix.netflix_ai.enriched_titles")
 mood_dist     = df_ai.groupBy("mood").count().orderBy(F.col("count").desc()).toPandas().to_dict("records")
 audience_dist = df_ai.groupBy("target_audience").count().orderBy(F.col("count").desc()).toPandas().to_dict("records")
 
-df_s    = spark.table("netflix_silver.stg_titles")
+df_s    = spark.table("netflix.netflix_silver.stg_titles")
 total   = df_s.count()
 movies  = df_s.filter(F.col("type") == "Movie").count()
 shows   = df_s.filter(F.col("type") == "TV Show").count()
@@ -194,8 +194,8 @@ df_insights = spark.createDataFrame(rows, ["insight_type", "insight_text", "gene
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
-    .saveAsTable("netflix_ai.strategic_insights")
+    .saveAsTable("netflix.netflix_ai.strategic_insights")
 )
 
-print(f"✅ netflix_ai.strategic_insights — {len(rows)} insights saved")
+print(f"✅ netflix.netflix_ai.strategic_insights — {len(rows)} insights saved")
 display(df_insights.select("insight_type", "generated_at"))

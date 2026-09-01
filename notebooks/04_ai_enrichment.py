@@ -3,7 +3,7 @@
 # MAGIC # 04 — AI Layer 1: Content Enrichment (Groq + Llama)
 # MAGIC Groq reads each Netflix title's description and generates structured metadata:
 # MAGIC mood, themes, target_audience, content_tags, decade_feel.
-# MAGIC Output written back to Delta as netflix_ai.enriched_titles.
+# MAGIC Output written back to Delta as netflix.netflix_ai.enriched_titles.
 
 # COMMAND ----------
 
@@ -34,7 +34,7 @@ print(f"✅ Groq client ready — model: {MODEL}")
 
 # COMMAND ----------
 
-df_silver = spark.table("netflix_silver.stg_titles")
+df_silver = spark.table("netflix.netflix_silver.stg_titles")
 
 SAMPLE_SIZE = 500
 df_sample = df_silver.filter(
@@ -139,10 +139,10 @@ df_spark  = spark.createDataFrame(df_final)
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
-    .saveAsTable("netflix_ai.enriched_titles")
+    .saveAsTable("netflix.netflix_ai.enriched_titles")
 )
 
-print(f"✅ netflix_ai.enriched_titles — {df_spark.count():,} rows")
+print(f"✅ netflix.netflix_ai.enriched_titles — {df_spark.count():,} rows")
 
 # COMMAND ----------
 
@@ -152,7 +152,7 @@ print(f"✅ netflix_ai.enriched_titles — {df_spark.count():,} rows")
 
 # MAGIC %sql
 # MAGIC SELECT mood, count(*) as count
-# MAGIC FROM netflix_ai.enriched_titles
+# MAGIC FROM netflix.netflix_ai.enriched_titles
 # MAGIC WHERE mood IS NOT NULL
 # MAGIC GROUP BY mood ORDER BY count DESC
 
@@ -160,12 +160,12 @@ print(f"✅ netflix_ai.enriched_titles — {df_spark.count():,} rows")
 
 # MAGIC %sql
 # MAGIC SELECT target_audience, type, count(*) as count
-# MAGIC FROM netflix_ai.enriched_titles
+# MAGIC FROM netflix.netflix_ai.enriched_titles
 # MAGIC WHERE target_audience IS NOT NULL
 # MAGIC GROUP BY target_audience, type ORDER BY count DESC
 
 # COMMAND ----------
 
-display(spark.table("netflix_ai.enriched_titles").select(
+display(spark.table("netflix.netflix_ai.enriched_titles").select(
     "title", "type", "mood", "themes", "target_audience", "decade_feel", "content_tags"
 ).limit(10))

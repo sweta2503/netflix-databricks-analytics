@@ -7,7 +7,7 @@
 # COMMAND ----------
 
 RAW_CSV      = "/Volumes/netflix/default/aidataset/netflix_titles.csv"
-BRONZE_TABLE = "netflix_bronze.raw_titles"
+BRONZE_TABLE = "netflix.netflix_bronze.raw_titles"
 
 # COMMAND ----------
 
@@ -74,4 +74,4 @@ for c in df_b.columns:
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DESCRIBE HISTORY netflix_bronze.raw_titles;
+# MAGIC DESCRIBE HISTORY netflix.netflix_bronze.raw_titles;
