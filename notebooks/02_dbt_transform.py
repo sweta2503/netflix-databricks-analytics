@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 02 — Silver Layer: dbt Transformations
 # MAGIC Runs the dbt project against Databricks.
@@ -34,7 +38,7 @@ netflix_project:
       http_path: {HTTP_PATH}
       token: {TOKEN}
       catalog: netflix
-      schema: netflix_silver
+      schema: default
       threads: 4
 """
 
@@ -65,6 +69,7 @@ version: '1.0.0'
 config-version: 2
 profile: netflix_project
 model-paths: ["models"]
+macro-paths: ["macros"]
 models:
   netflix_project:
     staging:
@@ -74,6 +79,23 @@ models:
       +materialized: table
       +file_format: delta
       +schema: netflix_gold
+""")
+
+# Create macros directory and custom schema macro
+# This prevents dbt from concatenating schemas (default_netflix_silver)
+# Instead it uses the custom schema name directly (netflix_silver)
+os.makedirs(f"{DBT_ROOT}/macros", exist_ok=True)
+with open(f"{DBT_ROOT}/macros/get_custom_schema.sql", "w") as f:
+    f.write("""
+{# Override dbt's default schema concatenation behavior #}
+{# Use custom schema names directly instead of target.schema + custom_schema #}
+{% macro generate_schema_name(custom_schema_name, node) -%}
+    {%- if custom_schema_name is none -%}
+        {{ target.schema }}
+    {%- else -%}
+        {{ custom_schema_name }}
+    {%- endif -%}
+{%- endmacro %}
 """)
 
 # sources.yml

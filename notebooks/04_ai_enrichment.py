@@ -1,8 +1,17 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 04 — AI Layer 1: Content Enrichment (Groq + Llama)
 # MAGIC Groq reads each Netflix title's description and generates structured metadata:
 # MAGIC mood, themes, target_audience, content_tags, decade_feel.
+# MAGIC
+# MAGIC **IMPORTANT**: This enriches a **500-title sample** for cost/time efficiency.
+# MAGIC Dashboard KPIs (Total Titles, Movies, TV Shows) should query `netflix_silver.stg_titles` (8,807 rows), 
+# MAGIC NOT the enriched sample. AI-specific visualizations (mood, audience) use the enriched subset.
+# MAGIC
 # MAGIC Output written back to Delta as netflix.netflix_ai.enriched_titles.
 
 # COMMAND ----------
@@ -36,13 +45,15 @@ print(f"✅ Groq client ready — model: {MODEL}")
 
 df_silver = spark.table("netflix.netflix_silver.stg_titles")
 
+# Sample size limited to control API costs and execution time
+# Processing all 8,807 titles would take ~30 minutes and cost ~$0.50-1.00 on Groq
 SAMPLE_SIZE = 500
 df_sample = df_silver.filter(
     F.col("description").isNotNull() & (F.col("description") != "")
 ).limit(SAMPLE_SIZE)
 
 titles = df_sample.select("show_id", "title", "type", "genres_raw", "description").toPandas()
-print(f"📥 Titles to enrich: {len(titles):,}")
+print(f"📥 Titles to enrich: {len(titles):,} (sample from {df_silver.count():,} total)")
 
 # COMMAND ----------
 
@@ -128,7 +139,8 @@ df_enriched["themes"]       = df_enriched["themes"].apply(lambda x: x if isinsta
 df_enriched["content_tags"] = df_enriched["content_tags"].apply(lambda x: x if isinstance(x, list) else [])
 
 df_silver_pd = df_sample.select(
-    "show_id", "title", "type", "genres_raw", "primary_country", "release_year", "description"
+    "show_id", "title", "type", "genres_raw", "primary_country", "release_year",
+    "date_added", "added_year", "description"
 ).toPandas()
 
 df_final = df_silver_pd.merge(df_enriched, on="show_id", how="left")

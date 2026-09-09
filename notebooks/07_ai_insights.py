@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 07 — AI Layer 4: Strategic Analyst (Groq + Llama 70B)
 # MAGIC Reads all Gold tables and AI-enriched data.
@@ -63,6 +67,22 @@ intl_growth   = to_dict("netflix.netflix_gold.international_growth")
 df_ai         = spark.table("netflix.netflix_ai.enriched_titles")
 mood_dist     = df_ai.groupBy("mood").count().orderBy(F.col("count").desc()).toPandas().to_dict("records")
 audience_dist = df_ai.groupBy("target_audience").count().orderBy(F.col("count").desc()).toPandas().to_dict("records")
+
+# Combined data for gap analysis: country x mood x audience
+# This allows AI to identify specific combinations that are underrepresented
+country_mood_audience = (
+    df_ai.filter(
+        F.col("primary_country").isNotNull() & 
+        F.col("mood").isNotNull() & 
+        F.col("target_audience").isNotNull()
+    )
+    .groupBy("primary_country", "mood", "target_audience")
+    .count()
+    .orderBy(F.col("count").desc())
+    .limit(100)
+    .toPandas()
+    .to_dict("records")
+)
 
 df_s    = spark.table("netflix.netflix_silver.stg_titles")
 total   = df_s.count()
@@ -131,23 +151,20 @@ print(insight_genre)
 # COMMAND ----------
 
 insight_gaps = ask_groq(f"""
-Top producing countries:
+Combined content distribution by country, mood, and target audience:
+{json.dumps(country_mood_audience, indent=2)}
+
+Top producing countries overall:
 {json.dumps(top_countries[:10], indent=2)}
 
-Genre distribution:
-{json.dumps(genres, indent=2)}
-
-Mood distribution:
-{json.dumps(mood_dist, indent=2)}
-
-Audience distribution:
-{json.dumps(audience_dist, indent=2)}
-
 Identify 3 specific content gaps in Netflix's catalog.
+Look for combinations of (country, mood, audience) that have low or zero count but would be strategic.
 For each gap:
 - State the gap precisely (region, mood, audience combo)
-- Back it with numbers from the data
+- Reference the actual counts from the combined data above
 - Explain why filling it would be strategically valuable
+
+IMPORTANT: Only cite gaps you can verify from the combined data table.
 """, max_tokens=700)
 
 print("=== CONTENT GAP ANALYSIS ===\n")

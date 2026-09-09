@@ -5,7 +5,10 @@
 # MAGIC This is Databricks-native orchestration — no Airflow needed.
 # MAGIC
 # MAGIC Pipeline:
-# MAGIC   Bronze → dbt Silver → Gold → AI Enrichment → AI Text-to-SQL → AI RAG → AI Insights → Export
+# MAGIC   Bronze → dbt Silver → Gold → AI Enrichment → AI Insights → Export
+# MAGIC
+# MAGIC Note: This pipeline runs the core data transformation and AI enrichment steps.
+# MAGIC Notebooks 05 (text-to-SQL) and 06 (RAG) are exploratory tools, not part of the production pipeline.
 
 # COMMAND ----------
 

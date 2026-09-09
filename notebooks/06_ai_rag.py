@@ -1,8 +1,15 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
-# MAGIC # 06 — AI Layer 3: Semantic Content Search / RAG (Groq + Llama 70B)
+# MAGIC # 06 — AI Layer 3: Content Discovery via LLM (Groq + Llama 70B)
+# MAGIC **Note**: This is NOT true RAG (Retrieval-Augmented Generation). 
+# MAGIC No embeddings or vector search — it sends up to 500 enriched catalog records directly in the LLM prompt.
+# MAGIC
 # MAGIC User describes what they want to watch in plain English.
-# MAGIC Groq finds the best matching Netflix titles from the enriched catalog.
+# MAGIC Groq analyzes the enriched catalog and recommends the best matching titles.
 
 # COMMAND ----------
 
