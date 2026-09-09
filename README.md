@@ -13,7 +13,7 @@ Raw CSV → Bronze (Unity Catalog) → Silver (dbt Transformations) → Gold (An
 **Key Technologies:**
 - **Databricks Lakehouse**: Unity Catalog, Delta Lake, Lakeflow Pipelines
 - **dbt Core**: Data transformations with Jinja templating
-- **Groq AI** (Llama 3.3 70B): Mood detection, audience targeting, strategic insights
+- **Groq AI** (Llama 3.1 8B for enrichment, Llama 3 70B for reasoning): Mood detection, audience targeting, strategic insights
 - **Streamlit**: Interactive dashboards
 - **Python**: PySpark, pandas, requests
 
@@ -27,7 +27,7 @@ Raw CSV → Bronze (Unity Catalog) → Silver (dbt Transformations) → Gold (An
 - Handles duplicates, missing values, type conversions
 
 ### 2. **AI-Powered Enrichment**
-- **Mood Detection**: Analyzes 500 sample titles to extract emotional tone (exciting, dark, heartwarming, etc.)
+- **Mood Detection**: Analyzes 500-title demo subset to extract emotional tone (Dark, Uplifting, Tense, Lighthearted, Emotional, Mysterious, Inspiring, Funny)
 - **Audience Targeting**: Identifies demographics (families, young adults, critics, etc.)
 - **Strategic Insights**: Gap analysis by country to recommend content strategies
 
@@ -42,20 +42,20 @@ Raw CSV → Bronze (Unity Catalog) → Silver (dbt Transformations) → Gold (An
 
 ```
 netflix-databricks-analytics/
-├── data/
-│   └── netflix_titles.csv          # Raw dataset (8,807 titles)
 ├── notebooks/
 │   ├── 00_setup.py                 # Environment setup, library installs
-│   ├── 01_bronze_ingestion.py      # CSV → Unity Catalog bronze layer
-│   ├── 02_dbt_silver_transform.py  # dbt Silver transformations
-│   ├── 03_dbt_gold_analytics.py    # dbt Gold aggregations
-│   ├── 04_ai_enrichment.py         # Groq AI mood/audience detection (500 samples)
-│   ├── 05_ai_text_to_sql.py        # Natural language → SQL query generation
-│   ├── 06_ai_rag.py                # Prompt-based catalog analysis (NOT true RAG)
-│   ├── 07_ai_insights.py           # Strategic gap analysis by country
+│   ├── 01_bronze_ingestion.py      # Reads /Volumes/netflix/default/aidataset/netflix_titles.csv → Unity Catalog bronze
+│   ├── 02_dbt_transform.py         # dbt Silver transformations (stg_titles)
+│   ├── 03_gold_analytics.py        # dbt Gold aggregations
+│   ├── 04_ai_enrichment.py         # Groq AI mood/audience detection (llama-3.1-8b-instant, 500-title subset)
+│   ├── 05_ai_text_to_sql.py        # Natural language → SQL (llama3-70b-8192)
+│   ├── 06_ai_rag.py                # Prompt-based catalog analysis (llama3-70b-8192, NOT true RAG)
+│   ├── 07_ai_insights.py           # Strategic gap analysis (llama3-70b-8192)
+│   ├── 08_export_for_dashboard.py  # Exports tables as CSV for Streamlit
 │   └── 09_run_pipeline.py          # Master orchestration pipeline
 ├── streamlit/
-│   └── app.py                      # Streamlit dashboard application
+│   ├── app.py                      # Streamlit dashboard (reads local CSV exports)
+│   └── data/                       # Downloaded CSV files from 08_export
 └── requirements.txt                # Python dependencies
 ```
 
@@ -76,9 +76,9 @@ netflix-databricks-analytics/
    cd netflix-databricks-analytics
    ```
 
-2. **Upload to Databricks Workspace**
-   - Import the `netflix-databricks-analytics` folder into `/Workspace/Users/<your-email>/`
-   - Ensure `data/netflix_titles.csv` is present
+2. **Prepare Data**
+   - Upload `netflix_titles.csv` to `/Volumes/netflix/default/aidataset/netflix_titles.csv`
+   - Or adjust the path in `01_bronze_ingestion.py` (line 2: `RAW_CSV = "/Volumes/...")`
 
 3. **Configure Environment**
    - Open `00_setup.py`
@@ -140,23 +140,25 @@ This is simpler, faster, and aligns better with the structured nature of the dat
 ## 📈 Data Pipeline Details
 
 ### Bronze Layer (`netflix.netflix_bronze.raw_titles`)
-- Direct CSV ingestion with minimal processing
+- Direct CSV ingestion with minimal processing (all columns read as strings)
 - Schema: `show_id`, `type`, `title`, `director`, `cast`, `country`, `date_added`, `release_year`, `rating`, `duration`, `listed_in`, `description`
 - Row count: 8,807
 
 ### Silver Layer (`netflix.netflix_silver.*`)
-- **`stg_titles`**: Cleaned staging table (duplicate removal, type casting, NULL handling)
-- **`fact_titles`**: Fact table with enhanced columns (`content_type_flag`, `country_split`)
-- **`dim_content_attributes`**: Dimension table for genre/rating lookups
+- **`stg_titles`**: Cleaned staging table with:
+  - Type casting (`release_year` → INT, `date_added` → TIMESTAMP)
+  - NULL handling (`nullif(trim())` for empty strings)
+  - Derived columns (`primary_country`, `added_year`, `duration_value`, `duration_unit`, `genres` array, `is_movie` flag)
+  - Note: No duplicate removal logic (relies on source data quality)
 
 ### Gold Layer (`netflix.netflix_gold.*`)
 - **`country_content_summary`**: Aggregated metrics by country
 - **`genre_trends`**: Genre distribution and popularity scores
 
-### AI Enrichment Layer (`netflix.netflix_gold.enriched_titles`)
-- **Sample size**: 500 titles (cost/time efficiency)
-- **Columns added**: `mood`, `primary_audience`
-- **Note**: Dashboard KPIs query `netflix_silver.stg_titles` (full 8,807 rows), not `enriched_titles`
+### AI Enrichment Layer (`netflix.netflix_ai.enriched_titles`)
+- **Sample size**: 500-title demo subset (`.limit(500)` NOT random sampling - sequential for reproducibility)
+- **Columns added**: `mood` (Dark, Uplifting, Tense, Lighthearted, Emotional, Mysterious, Inspiring, Funny), `themes`, `target_audience`, `content_tags`, `decade_feel`
+- **Note**: Dashboard KPIs read from `full_catalog.csv` (exported from `netflix_silver.stg_titles`, 8,807 rows). AI visualizations use `enriched_titles.csv` (500 rows)
 
 ---
 
@@ -168,9 +170,11 @@ This is simpler, faster, and aligns better with the structured nature of the dat
 - Custom schema naming (avoids `netflix_silver_netflix_silver` concatenation)
 
 ### 2. **Groq AI Integration**
-- **Model**: Llama 3.3 70B Versatile (fast, cost-effective)
-- **Rate limiting**: 30 requests/minute (built-in retry logic)
-- **Structured outputs**: JSON parsing for mood/audience extraction
+- **Models**: 
+  - **Notebook 04**: `llama-3.1-8b-instant` (high-volume enrichment, 500 titles)
+  - **Notebooks 05-07**: `llama3-70b-8192` (text-to-SQL, RAG, strategic insights - better reasoning)
+- **Rate limiting**: Built-in exponential backoff retry logic
+- **Structured outputs**: JSON parsing for mood/audience extraction (no temperature config - uses model defaults)
 
 ### 3. **Cost Optimization**
 - AI enrichment limited to 500 samples (~$0.50/run vs. $8.00 for full dataset)
@@ -186,12 +190,9 @@ This is simpler, faster, and aligns better with the structured nature of the dat
 2. India: 1,046 titles
 3. United Kingdom: 806 titles
 
-**Mood Distribution (500-sample analysis):**
-- Exciting: 32%
-- Heartwarming: 24%
-- Dark: 18%
-- Suspenseful: 15%
-- Humorous: 11%
+**Mood Distribution (500-title demo subset):**
+- Dark, Uplifting, Tense, Lighthearted, Emotional, Mysterious, Inspiring, Funny
+- (Exact distribution varies by sample - run `04_ai_enrichment.py` to generate current distribution)
 
 **Strategic Gap Example:**
 > "India has strong comedy/drama presence but lacks thriller content compared to US. Recommend licensing suspenseful series targeting young adults."
@@ -210,10 +211,20 @@ This is simpler, faster, and aligns better with the structured nature of the dat
    - **Fix**: Reduce batch size in `04_ai_enrichment.py` (default: 10 titles/batch)
    - Add `time.sleep(2)` between batches
 
-3. **Dashboard shows wrong KPI counts**
-   - **Fix**: Ensure dashboard queries point to `netflix.netflix_silver.stg_titles` (8,807 rows), not `netflix.netflix_gold.enriched_titles` (500 rows)
+3. **Dashboard shows wrong KPI counts (500 instead of 8,807)**
+   - **Root cause**: Streamlit `app.py` was reading from `enriched_titles.csv` (500 rows) for KPIs
+   - **Fix**: 
+     - Notebook `08_export_for_dashboard.py` now exports `full_catalog.csv` from `netflix_silver.stg_titles`
+     - Streamlit `app.py` updated to read `full_catalog.csv` for KPIs, `enriched_titles.csv` only for mood/audience viz
 
-4. **Pipeline fails at dbt step**
+4. **Pipeline syntax error: `timeout=300` invalid**
+   - **Root cause**: Tuple unpacking expects positional args, not keyword args
+   - **Fix**: Changed `(name, notebook, params, timeout=300)` → `(name, notebook, params, 300)` in `09_run_pipeline.py`
+
+5. **dbt schema naming concatenation (`netflix_silver_netflix_silver`)**
+   - **Fix**: Custom macro `macros/get_custom_schema.sql` prevents concatenation. Profile schema set to `default`, custom schemas use `netflix_silver` and `netflix_gold` directly.
+
+6. **Pipeline fails at dbt step**
    - **Fix**: Run `dbt debug` to check profiles/connection
    - Ensure catalog/schema exist and you have CREATE TABLE permissions
 

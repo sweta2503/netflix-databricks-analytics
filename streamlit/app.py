@@ -32,7 +32,8 @@ country_analysis = load("country_analysis.csv")
 rating_dist      = load("rating_distribution.csv")
 top_directors    = load("top_directors.csv")
 intl_growth      = load("international_growth.csv")
-enriched         = load("enriched_titles.csv")
+full_catalog     = load("full_catalog.csv")        # FULL 8,807 titles for accurate KPIs
+enriched         = load("enriched_titles.csv")     # 500-title AI sample for mood/audience viz
 insights         = load("strategic_insights.csv")
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -48,12 +49,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── KPI row ───────────────────────────────────────────────────────────────────
+# KPIs use FULL catalog (8,807 titles), not the AI-enriched sample (500 titles)
 
-if enriched is not None:
-    total    = len(enriched)
-    movies   = len(enriched[enriched["type"] == "Movie"])
+if full_catalog is not None:
+    total    = len(full_catalog)
+    movies   = len(full_catalog[full_catalog["type"] == "Movie"])
     shows    = total - movies
-    ctries   = enriched["primary_country"].nunique()
+    ctries   = full_catalog["primary_country"].nunique()
 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total Titles",  f"{total:,}")
