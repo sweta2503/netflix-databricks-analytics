@@ -4,3 +4,4 @@ __pycache__/
 .DS_Store
 data/*.csv
 *.ipynb_checkpoints
+YOUTUBE_TUTORIAL_GUIDE.md
