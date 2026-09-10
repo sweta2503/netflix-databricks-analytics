@@ -7,14 +7,15 @@ An end-to-end data engineering and AI analytics platform built on Databricks, an
 ## 🏗️ Architecture Overview
 
 ```
-Raw CSV → Bronze (Unity Catalog) → Silver (dbt Transformations) → Gold (Analytics) → AI Enrichment → Dashboards
+Raw CSV → Bronze (Unity Catalog) → Silver (dbt Transformations) → Gold (Analytics) → AI Enrichment
+         ↓                ↓                                          ↓                  ↓
+   Delta Tables    Delta Tables                              Delta Tables       Delta Tables (AI-enriched)
 ```
 
 **Key Technologies:**
 - **Databricks Lakehouse**: Unity Catalog, Delta Lake, Lakeflow Pipelines
 - **dbt Core**: Data transformations with Jinja templating
 - **Groq AI** (Llama 3.1 8B for enrichment, Llama 3 70B for reasoning): Mood detection, audience targeting, strategic insights
-- **Streamlit**: Interactive dashboards
 - **Python**: PySpark, pandas, requests
 
 ---
@@ -31,10 +32,10 @@ Raw CSV → Bronze (Unity Catalog) → Silver (dbt Transformations) → Gold (An
 - **Audience Targeting**: Identifies demographics (families, young adults, critics, etc.)
 - **Strategic Insights**: Gap analysis by country to recommend content strategies
 
-### 3. **Interactive Dashboards**
-- Real-time KPI visualization (8,807 titles across Bronze/Silver/Gold layers)
-- AI enrichment results browser
-- Country-level content distribution heatmaps
+### 3. **Analytics Tables**
+- Unity Catalog Delta tables with full Netflix catalog (8,807 titles)
+- AI-enriched metadata (mood, audience) for 500-title demo subset
+- Ready for downstream dashboards or BI tools
 
 ---
 
@@ -51,11 +52,7 @@ netflix-databricks-analytics/
 │   ├── 05_ai_text_to_sql.py        # Natural language → SQL (llama3-70b-8192)
 │   ├── 06_ai_rag.py                # Prompt-based catalog analysis (llama3-70b-8192, NOT true RAG)
 │   ├── 07_ai_insights.py           # Strategic gap analysis (llama3-70b-8192)
-│   ├── 08_export_for_dashboard.py  # Exports tables as CSV for Streamlit
 │   └── 09_run_pipeline.py          # Master orchestration pipeline
-├── streamlit/
-│   ├── app.py                      # Streamlit dashboard (reads local CSV exports)
-│   └── data/                       # Downloaded CSV files from 08_export
 └── requirements.txt                # Python dependencies
 ```
 
@@ -93,10 +90,13 @@ netflix-databricks-analytics/
    - Execute all cells to run the full pipeline (Bronze → Silver → Gold → AI)
    - Total runtime: ~15-20 minutes
 
-5. **View Dashboard**
-   - Install Streamlit: `pip install streamlit`
-   - Run: `streamlit run streamlit/app.py`
-   - Access at `http://localhost:8501`
+5. **Query Results**
+   - All outputs are stored as Delta tables in Unity Catalog:
+     - `netflix_bronze.raw_titles` (8,807 titles)
+     - `netflix_silver.stg_titles` (cleaned/transformed)
+     - `netflix_gold.*` (analytics aggregations)
+     - `netflix_gold.ai_enriched_titles` (500 titles with mood/audience)
+   - Query directly in Databricks SQL Editor or build dashboards with AI/BI
 
 ---
 
@@ -155,10 +155,10 @@ This is simpler, faster, and aligns better with the structured nature of the dat
 - **`country_content_summary`**: Aggregated metrics by country
 - **`genre_trends`**: Genre distribution and popularity scores
 
-### AI Enrichment Layer (`netflix.netflix_ai.enriched_titles`)
+### AI Enrichment Layer (`netflix.netflix_gold.ai_enriched_titles`)
 - **Sample size**: 500-title demo subset (`.limit(500)` NOT random sampling - sequential for reproducibility)
 - **Columns added**: `mood` (Dark, Uplifting, Tense, Lighthearted, Emotional, Mysterious, Inspiring, Funny), `themes`, `target_audience`, `content_tags`, `decade_feel`
-- **Note**: Dashboard KPIs read from `full_catalog.csv` (exported from `netflix_silver.stg_titles`, 8,807 rows). AI visualizations use `enriched_titles.csv` (500 rows)
+- **Full catalog available**: `netflix_silver.stg_titles` contains all 8,807 titles without AI enrichment
 
 ---
 
@@ -211,20 +211,14 @@ This is simpler, faster, and aligns better with the structured nature of the dat
    - **Fix**: Reduce batch size in `04_ai_enrichment.py` (default: 10 titles/batch)
    - Add `time.sleep(2)` between batches
 
-3. **Dashboard shows wrong KPI counts (500 instead of 8,807)**
-   - **Root cause**: Streamlit `app.py` was reading from `enriched_titles.csv` (500 rows) for KPIs
-   - **Fix**: 
-     - Notebook `08_export_for_dashboard.py` now exports `full_catalog.csv` from `netflix_silver.stg_titles`
-     - Streamlit `app.py` updated to read `full_catalog.csv` for KPIs, `enriched_titles.csv` only for mood/audience viz
-
-4. **Pipeline syntax error: `timeout=300` invalid**
+3. **Pipeline syntax error: `timeout=300` invalid**
    - **Root cause**: Tuple unpacking expects positional args, not keyword args
    - **Fix**: Changed `(name, notebook, params, timeout=300)` → `(name, notebook, params, 300)` in `09_run_pipeline.py`
 
-5. **dbt schema naming concatenation (`netflix_silver_netflix_silver`)**
+4. **dbt schema naming concatenation (`netflix_silver_netflix_silver`)**
    - **Fix**: Custom macro `macros/get_custom_schema.sql` prevents concatenation. Profile schema set to `default`, custom schemas use `netflix_silver` and `netflix_gold` directly.
 
-6. **Pipeline fails at dbt step**
+5. **Pipeline fails at dbt step**
    - **Fix**: Run `dbt debug` to check profiles/connection
    - Ensure catalog/schema exist and you have CREATE TABLE permissions
 
@@ -245,7 +239,7 @@ This is simpler, faster, and aligns better with the structured nature of the dat
 **Databricks Platform:**
 - Notebook orchestration
 - Lakeflow Pipeline design
-- Streamlit dashboard deployment
+- Unity Catalog table management
 
 ---
 
